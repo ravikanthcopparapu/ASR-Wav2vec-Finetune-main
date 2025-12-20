@@ -36,23 +36,41 @@ class Inferencer:
         return pred_transcript
 
     def run(self, test_filepath):
-        filename = test_filepath.split('/')[-1].split('.')[0]
-        filetype = test_filepath.split('.')[1]
-        if filetype == 'txt':
-            f = open(test_filepath, 'r')
-            lines = f.read().splitlines()
-            f.close()
+      filename = os.path.basename(test_filepath).split('.')[0]
+      filetype = os.path.splitext(test_filepath)[1].lower()
+      base_dir = os.path.dirname(test_filepath)
 
-            f = open(test_filepath.replace(filename, 'transcript_'+filename), 'w+')
-            for line in tqdm(lines):
-                wav, _ = librosa.load(line, sr = 16000)
-                transcript = self.transcribe(wav)
-                f.write(line + ' ' + transcript + '\n')
-            f.close()
+      if filetype == '.txt':
+          with open(test_filepath, 'r', encoding='utf-8') as f:
+              lines = f.read().splitlines()
 
-        else:
-            wav, _ = librosa.load(test_filepath, sr = 16000)
-            print(f"transcript: {self.transcribe(wav)}")
+          out_path = os.path.join(base_dir, f"transcript_{filename}.txt")
+          with open(out_path, 'w', encoding='utf-8') as fout:
+              for line in tqdm(lines):
+                  line = line.strip()
+                  if not line or line.lower().startswith("path"):
+                      continue
+
+                  # 🔑 IMPORTANT: split path|transcript
+                  audio_path = line.split('|', 1)[0].strip()
+
+                  if not os.path.isabs(audio_path):
+                      audio_path = os.path.join(base_dir, audio_path)
+
+                  if not os.path.exists(audio_path):
+                      print(f"[WARN] Missing file: {audio_path}")
+                      continue
+
+                  wav, _ = librosa.load(audio_path, sr=16000)
+                  transcript = self.transcribe(wav)
+                  fout.write(f"{audio_path}\t{transcript}\n")
+
+          print(f"✅ Output saved to {out_path}")
+
+      else:
+          wav, _ = librosa.load(test_filepath, sr=16000)
+          print(self.transcribe(wav))
+
 
 
 if __name__ == '__main__':
