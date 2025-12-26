@@ -2,7 +2,7 @@
 name = "v1" 
 pretrained_path = "facebook/wav2vec2-base"
 seed = 42
-epochs = 100
+epochs = 15
 save_dir = "saved/" 
 gradient_accumulation_steps = 2
 use_amp = true # Whether to use Automatic Mixed Precision for speeding up - https://pytorch.org/docs/stable/amp.html
@@ -38,7 +38,7 @@ blocking = false # whether to wait until the model is uploaded (this will be ver
 [train_dataset]
 path = "base.base_dataset.BaseDataset"
     [train_dataset.args]
-    path = "/pass/your/train_dataset/path/here"
+    path = "/content/train.txt"
     preload_data = false
     delimiter = "|"
     # Only train audio files that have duration in range [min_duration, max_duration]
@@ -60,7 +60,7 @@ path = "base.base_dataset.BaseDataset"
 [val_dataset]
 path = "base.base_dataset.BaseDataset"
     [val_dataset.args]
-    path = "/pass/your/val_dataset/path/here"
+    path = "/content/validation.txt"
     preload_data = false
     delimiter = "|"
     nb_workers = 4
@@ -72,6 +72,14 @@ path = "base.base_dataset.BaseDataset"
     [val_dataset.sampler]
     shuffle = false 
     drop_last = false
+
+[test_dataset]
+path = "base.base_dataset.BaseDataset"
+    [test_dataset.args]
+    path = "/content/test.txt"
+    preload_data = false
+    delimiter = "|"
+    nb_workers = 4
 
  
 [optimizer]
