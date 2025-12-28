@@ -76,7 +76,7 @@ path = "base.base_dataset.BaseDataset"
 [test_dataset]
 path = "base.base_dataset.BaseDataset"
     [test_dataset.args]
-    path = "/content/test.txt"
+    path = "C:\Users\Ravi\Videos\AST\ASRWorkSpace\ASR-Wav2vec-Finetune-main\test\test.txt"
     preload_data = false
     delimiter = "|"
     nb_workers = 4

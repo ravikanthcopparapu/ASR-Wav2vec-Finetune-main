@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ASR - IIIT Hyderabad</title>
+    <style>
+        body { font-family: Arial; margin: 0; background: #f5f5f5; }
+        .header { background: white; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header h1 { color: #0d7377; margin: 0; font-size: 24px; }
+        .header p { color: #666; margin: 5px 0 0 0; font-size: 14px; }
+        .nav { background: #0d7377; padding: 15px 20px; }
+        .nav button { background: rgba(0,0,0,0.3); border: none; color: white; padding: 10px 20px; margin-right: 5px; cursor: pointer; }
+        .container { max-width: 800px; margin: 30px auto; padding: 20px; }
+        .card { background: white; padding: 30px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; margin-bottom: 20px; }
+        ul { padding-left: 30px; }
+        li { margin: 10px 0; }
+        .center { text-align: center; }
+        select { padding: 10px 20px; font-size: 16px; border: 2px solid #ddd; border-radius: 5px; }
+        .mic-btn { width: 80px; height: 80px; border-radius: 50%; border: none; background: #0d7377; color: white; font-size: 30px; cursor: pointer; margin: 20px 0; }
+        .mic-btn.rec { background: #dc2626; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .upload-btn { padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 5px; cursor: pointer; margin: 10px; }
+        input[type="file"] { display: none; }
+        audio { width: 100%; margin: 10px 0; }
+        .process-btn { padding: 12px 30px; background: #16a34a; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        .process-btn:disabled { background: #999; }
+        .error { background: #fee2e2; border-left: 4px solid #dc2626; color: #991b1b; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .result { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-radius: 5px; min-height: 60px; }
+        .hide { display: none; }
+        .clear-btn { padding: 8px 15px; background: white; color: #dc2626; border: 1px solid #dc2626; border-radius: 5px; cursor: pointer; margin: 10px 0; }
+        footer { background: #1f2937; color: white; text-align: center; padding: 20px; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Automatic Speech Recognition</h1>
+        <p>Speech Processing Lab, IIIT Hyderabad</p>
+    </div>
+    
+    <div class="nav">
+        <button>Home</button>
+        <button>Offline</button>
+        <button>Test with voice</button>
+    </div>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Guidelines</h2>
+            <ul>
+                <li>Click microphone to record audio</li>
+                <li>Or upload a .wav file</li>
+                <li>Select language and click Transcribe</li>
+            </ul>
+        </div>
+        
+        <div class="card center">
+            <label><strong style="color: #1e40af;">Select Language:</strong></label><br><br>
+            <select id="lang">
+                <option value="telugu">Telugu-V1 (CSTD)</option>
+                <option value="hindi">Hindi</option>
+                <option value="english">English</option>
+                <option value="multilingual">Multilingual</option>
+            </select>
+        </div>
+        
+        <div class="card center">
+            <button id="mic" class="mic-btn">🎤</button>
+            <div id="status">Click microphone to record</div>
+            <div style="margin: 20px 0;">- OR -</div>
+            <label for="file" class="upload-btn">Upload .wav File</label>
+            <input type="file" id="file" accept=".wav">
+            <div id="filename" class="hide"></div>
+        </div>
+        
+        <div id="player-card" class="card hide">
+            <h3>Audio Preview</h3>
+            <audio id="audio" controls></audio>
+            <button id="clear" class="clear-btn">Clear</button>
+        </div>
+        
+        <div id="proc-card" class="card center hide">
+            <button id="proc" class="process-btn">Transcribe Audio</button>
+        </div>
+        
+        <div id="error" class="card error hide"></div>
+        
+        <div id="trans-card" class="card hide">
+            <h3>Transcription:</h3>
+            <div id="trans" class="result"></div>
+        </div>
+    </div>
+    
+    <footer>© 2024 IIIT Hyderabad - Speech Processing Lab</footer>
+    
+    <script>
+        var API = {
+            telugu: 'http://localhost:8000/transcribe',
+            hindi: 'http://localhost:8001/transcribe',
+            english: 'http://localhost:8002/transcribe',
+            multilingual: 'http://localhost:8003/transcribe'
+        };
+        
+        var rec, chunks = [], isRec = false, blob, url;
+        var mic = document.getElementById('mic');
+        var status = document.getElementById('status');
+        var file = document.getElementById('file');
+        var filename = document.getElementById('filename');
+        var playerCard = document.getElementById('player-card');
+        var audio = document.getElementById('audio');
+        var clear = document.getElementById('clear');
+        var procCard = document.getElementById('proc-card');
+        var proc = document.getElementById('proc');
+        var error = document.getElementById('error');
+        var transCard = document.getElementById('trans-card');
+        var trans = document.getElementById('trans');
+        var lang = document.getElementById('lang');
+        
+        mic.onclick = function() {
+            if (isRec) {
+                if (rec) {
+                    rec.stop();
+                    isRec = false;
+                    mic.classList.remove('rec');
+                    status.textContent = 'Click microphone to record';
+                }
+            } else {
+                error.classList.add('hide');
+                navigator.mediaDevices.getUserMedia({audio: true}).then(function(s) {
+                    rec = new MediaRecorder(s);
+                    chunks = [];
+                    rec.ondataavailable = function(e) {
+                        chunks.push(e.data);
+                    };
+                    rec.onstop = function() {
+                        var webmBlob = new Blob(chunks, {type: 'audio/webm'});
+                        convertToWav(webmBlob, function(wavBlob) {
+                            blob = wavBlob;
+                            if (url) URL.revokeObjectURL(url);
+                            url = URL.createObjectURL(blob);
+                            audio.src = url;
+                            playerCard.classList.remove('hide');
+                            procCard.classList.remove('hide');
+                            transCard.classList.add('hide');
+                        });
+                        s.getTracks()[0].stop();
+                    };
+                    rec.start();
+                    isRec = true;
+                    mic.classList.add('rec');
+                    status.textContent = 'Recording... Click to stop';
+                }).catch(function(e) {
+                    error.textContent = 'Mic error: ' + e.message;
+                    error.classList.remove('hide');
+                });
+            }
+        };
+        
+        function convertToWav(webmBlob, callback) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioContext.decodeAudioData(e.target.result, function(audioBuffer) {
+                    var offlineContext = new OfflineAudioContext(1, audioBuffer.duration * 16000, 16000);
+                    var source = offlineContext.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(offlineContext.destination);
+                    source.start(0);
+                    
+                    offlineContext.startRendering().then(function(resampled) {
+                        var wavBuffer = encodeWav(resampled);
+                        var wavBlob = new Blob([wavBuffer], {type: 'audio/wav'});
+                        callback(wavBlob);
+                    });
+                });
+            };
+            reader.readAsArrayBuffer(webmBlob);
+        }
+        
+        function encodeWav(audioBuffer) {
+            var numChannels = audioBuffer.numberOfChannels;
+            var sampleRate = audioBuffer.sampleRate;
+            var format = 1;
+            var bitDepth = 16;
+            
+            var samples;
+            if (numChannels === 2) {
+                var left = audioBuffer.getChannelData(0);
+                var right = audioBuffer.getChannelData(1);
+                samples = new Int16Array(left.length);
+                for (var i = 0; i < left.length; i++) {
+                    var s = Math.max(-1, Math.min(1, (left[i] + right[i]) / 2));
+                    samples[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+            } else {
+                var channelData = audioBuffer.getChannelData(0);
+                samples = new Int16Array(channelData.length);
+                for (var i = 0; i < channelData.length; i++) {
+                    var s = Math.max(-1, Math.min(1, channelData[i]));
+                    samples[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+            }
+            
+            var buffer = new ArrayBuffer(44 + samples.length * 2);
+            var view = new DataView(buffer);
+            
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + samples.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, format, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, bitDepth, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, samples.length * 2, true);
+            
+            var offset = 44;
+            for (var i = 0; i < samples.length; i++) {
+                view.setInt16(offset, samples[i], true);
+                offset += 2;
+            }
+            
+            return buffer;
+        }
+        
+        function writeString(view, offset, string) {
+            for (var i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+        
+        file.onchange = function(e) {
+            var f = e.target.files[0];
+            if (!f) return;
+            if (!f.name.endsWith('.wav')) {
+                error.textContent = 'Please upload .wav file';
+                error.classList.remove('hide');
+                return;
+            }
+            error.classList.add('hide');
+            blob = f;
+            if (url) URL.revokeObjectURL(url);
+            url = URL.createObjectURL(f);
+            audio.src = url;
+            filename.textContent = 'File: ' + f.name;
+            filename.classList.remove('hide');
+            playerCard.classList.remove('hide');
+            procCard.classList.remove('hide');
+            transCard.classList.add('hide');
+        };
+        
+        clear.onclick = function() {
+            blob = null;
+            if (url) {
+                URL.revokeObjectURL(url);
+                url = null;
+            }
+            audio.src = '';
+            file.value = '';
+            filename.classList.add('hide');
+            playerCard.classList.add('hide');
+            procCard.classList.add('hide');
+            transCard.classList.add('hide');
+            error.classList.add('hide');
+        };
+        
+        proc.onclick = function() {
+            if (!blob) {
+                error.textContent = 'Please record or upload audio';
+                error.classList.remove('hide');
+                return;
+            }
+            proc.disabled = true;
+            proc.textContent = 'Processing...';
+            error.classList.add('hide');
+            transCard.classList.add('hide');
+            
+            var fd = new FormData();
+            fd.append('file', blob, 'audio.wav');
+            
+            fetch(API[lang.value], {method: 'POST', body: fd})
+                .then(function(r) {
+                    if (!r.ok) throw new Error('Server error');
+                    return r.json();
+                })
+                .then(function(d) {
+                    if (d.error) {
+                        error.textContent = d.error;
+                        error.classList.remove('hide');
+                    } else {
+                        trans.textContent = d.transcription || 'No transcription';
+                        transCard.classList.remove('hide');
+                    }
+                    proc.disabled = false;
+                    proc.textContent = 'Transcribe Audio';
+                })
+                .catch(function(e) {
+                    error.textContent = 'Error: ' + e.message;
+                    error.classList.remove('hide');
+                    proc.disabled = false;
+                    proc.textContent = 'Transcribe Audio';
+                });
+        };
+    </script>
+</body>
+</html>
