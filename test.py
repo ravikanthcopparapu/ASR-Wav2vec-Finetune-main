@@ -1,5 +1,4 @@
 import argparse
-import json
 import torch
 import toml
 import os
@@ -8,8 +7,6 @@ from torch.utils.data import DataLoader
 
 from transformers import (
     Wav2Vec2ForCTC,
-    Wav2Vec2FeatureExtractor,
-    Wav2Vec2CTCTokenizer,
     Wav2Vec2Processor
 )
 
@@ -38,35 +35,24 @@ def main(args):
     # --------------------------------------------------
     # Load test dataset
     # --------------------------------------------------
+    # ---- FIX: add rank & dist for non-distributed testing ----
+    test_args = config["test_dataset"]["args"]
+    test_args["rank"] = 0
+    test_args["dist"] = False
+
     test_base_ds = initialize_module(
-        config["test_dataset"]["path"],
-        args=config["test_dataset"]["args"]
-    )
+    config["test_dataset"]["path"],
+    args=test_args
+)
+
 
     test_ds = test_base_ds.get_data()
-
     print("Number of test utterances:", len(test_ds))
 
     # --------------------------------------------------
-    # Load vocab (generated during training)
+    # Load Processor (AUTO loads vocab, tokenizer, feature extractor)
     # --------------------------------------------------
-    vocab_path = args.vocab
-    assert os.path.exists(vocab_path), f"Missing vocab file: {vocab_path}"
-
-    tokenizer = Wav2Vec2CTCTokenizer(
-        vocab_path,
-        **config["special_tokens"],
-        word_delimiter_token="|"
-    )
-
-    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
-        config["meta"]["pretrained_path"]
-    )
-
-    processor = Wav2Vec2Processor(
-        feature_extractor=feature_extractor,
-        tokenizer=tokenizer
-    )
+    processor = Wav2Vec2Processor.from_pretrained(args.checkpoint)
 
     collate_fn = DefaultCollate(processor, config["meta"]["sr"])
 
@@ -79,17 +65,13 @@ def main(args):
     )
 
     # --------------------------------------------------
-    # Load model
+    # Load HuggingFace Model (model.safetensors)
     # --------------------------------------------------
     model = Wav2Vec2ForCTC.from_pretrained(
-        config["meta"]["pretrained_path"],
+        args.checkpoint,
         ctc_loss_reduction="sum",
-        pad_token_id=processor.tokenizer.pad_token_id,
-        vocab_size=len(processor.tokenizer)
+        pad_token_id=processor.tokenizer.pad_token_id
     )
-
-    checkpoint = torch.load(args.checkpoint, map_location="cpu")
-    model.load_state_dict(checkpoint["model"], strict=True)
 
     model.to(device)
     model.eval()
@@ -132,7 +114,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="ASR TEST")
+    parser = argparse.ArgumentParser(description="ASR TEST (HuggingFace Model)")
 
     parser.add_argument(
         "-c", "--config",
@@ -145,14 +127,7 @@ if __name__ == "__main__":
         "-t", "--checkpoint",
         required=True,
         type=str,
-        help="Path to trained model checkpoint (.tar)"
-    )
-
-    parser.add_argument(
-        "-v", "--vocab",
-        default="vocab.json",
-        type=str,
-        help="Path to vocab.json generated during training"
+        help="Path to HuggingFace model directory (contains model.safetensors)"
     )
 
     args = parser.parse_args()
