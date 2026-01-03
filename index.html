@@ -57,10 +57,8 @@
         <div class="card center">
             <label><strong style="color: #1e40af;">Select Language:</strong></label><br><br>
             <select id="lang">
-                <option value="telugu">Telugu-V1 (CSTD)</option>
                 <option value="hindi">Hindi</option>
-                <option value="english">English</option>
-                <option value="multilingual">Multilingual</option>
+                <option value="multilingual">Multilingual(Hindi-Tel)</option>
             </select>
         </div>
         
@@ -95,9 +93,9 @@
     
     <script>
         var API = {
-            telugu: 'http://localhost:8000/transcribe',
-            hindi: 'http://localhost:8001/transcribe',
-            english: 'http://localhost:8002/transcribe',
+            //telugu: 'http://localhost:8000/transcribe',
+            hindi: 'http://localhost:8000/transcribe',
+            //english: 'http://localhost:8002/transcribe',
             multilingual: 'http://localhost:8003/transcribe'
         };
         
