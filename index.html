@@ -16,7 +16,9 @@
         ul { padding-left: 30px; }
         li { margin: 10px 0; }
         .center { text-align: center; }
-        select { padding: 10px 20px; font-size: 16px; border: 2px solid #ddd; border-radius: 5px; }
+        .select-group { margin-bottom: 20px; }
+        .select-group label { display: block; font-weight: bold; color: #1e40af; margin-bottom: 10px; }
+        select { padding: 10px 20px; font-size: 16px; border: 2px solid #ddd; border-radius: 5px; min-width: 200px; }
         .mic-btn { width: 80px; height: 80px; border-radius: 50%; border: none; background: #0d7377; color: white; font-size: 30px; cursor: pointer; margin: 20px 0; }
         .mic-btn.rec { background: #dc2626; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
@@ -48,18 +50,30 @@
         <div class="card">
             <h2>Guidelines</h2>
             <ul>
+                <li>Select model and language first</li>
                 <li>Click microphone to record audio</li>
                 <li>Or upload a .wav file</li>
-                <li>Select language and click Transcribe</li>
+                <li>Click Transcribe to get results</li>
             </ul>
         </div>
         
         <div class="card center">
-            <label><strong style="color: #1e40af;">Select Language:</strong></label><br><br>
-            <select id="lang">
-                <option value="hindi">Hindi</option>
-                <option value="multilingual">Multilingual(Hindi-Tel)</option>
-            </select>
+            <div class="select-group">
+                <label for="model">Select Model:</label>
+                <select id="model">
+                    <option value="wav2vec">Wav2Vec</option>
+                    <option value="whisper">Whisper</option>
+                    <option value="vasista">Vasista</option>
+                </select>
+            </div>
+            
+            <div class="select-group">
+                <label for="lang">Select Language:</label>
+                <select id="lang">
+                    <option value="hindi">Hindi</option>
+                    <option value="multilingual">Multilingual(Hindi-Tel)</option>
+                </select>
+            </div>
         </div>
         
         <div class="card center">
@@ -92,11 +106,13 @@
     <footer>© 2024 IIIT Hyderabad - Speech Processing Lab</footer>
     
     <script>
-        var API = {
-            //telugu: 'http://localhost:8000/transcribe',
-            hindi: 'http://localhost:8000/transcribe',
-            //english: 'http://localhost:8002/transcribe',
-            multilingual: 'http://localhost:8003/transcribe'
+        var API_ENDPOINTS = {
+            'wav2vec-hindi': 'http://localhost:8000/transcribe',
+            'wav2vec-multilingual': 'http://localhost:8003/transcribe',
+            'whisper-hindi': 'http://localhost:8005/transcribe',
+            'whisper-multilingual': 'http://localhost:8005/transcribe',
+            'vasista-hindi': 'http://localhost:8006/transcribe',
+            'vasista-multilingual': 'http://localhost:8006/transcribe'
         };
         
         var rec, chunks = [], isRec = false, blob, url;
@@ -112,7 +128,13 @@
         var error = document.getElementById('error');
         var transCard = document.getElementById('trans-card');
         var trans = document.getElementById('trans');
+        var model = document.getElementById('model');
         var lang = document.getElementById('lang');
+        
+        function getApiEndpoint() {
+            var key = model.value + '-' + lang.value;
+            return API_ENDPOINTS[key];
+        }
         
         mic.onclick = function() {
             if (isRec) {
@@ -272,6 +294,14 @@
                 error.classList.remove('hide');
                 return;
             }
+            
+            var endpoint = getApiEndpoint();
+            if (!endpoint) {
+                error.textContent = 'Invalid model/language combination';
+                error.classList.remove('hide');
+                return;
+            }
+            
             proc.disabled = true;
             proc.textContent = 'Processing...';
             error.classList.add('hide');
@@ -280,7 +310,7 @@
             var fd = new FormData();
             fd.append('file', blob, 'audio.wav');
             
-            fetch(API[lang.value], {method: 'POST', body: fd})
+            fetch(endpoint, {method: 'POST', body: fd})
                 .then(function(r) {
                     if (!r.ok) throw new Error('Server error');
                     return r.json();

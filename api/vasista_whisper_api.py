@@ -3,6 +3,7 @@ import uuid
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from transformers import pipeline
 import shutil
+from fastapi.middleware.cors import CORSMiddleware
 
 # ==========================
 # CONFIG
@@ -23,6 +24,14 @@ app = FastAPI(
     title="Whisper Hindi ASR API",
     description="Upload an audio file and get Hindi transcription using Whisper",
     version="1.0.0"
+)
+# Add CORS middleware - THIS IS CRITICAL
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 print("Loading Whisper model from Hugging Face:", MODEL_ID)

@@ -3,8 +3,18 @@ from transformers import pipeline
 import tempfile
 import shutil
 import os
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Whisper ASR API")
+# Add CORS middleware - THIS IS CRITICAL
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
 
 # ============ CONFIG ============
 MODEL_DIR = "C:/Users/Ravi/Videos/AST/ASRWorkSpace/ASR-Wav2vec-Finetune-main/final_whisper_model"   # path to your model folder
