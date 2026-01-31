@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Live Multilingual Transcription</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background: #f7f7f7;
+        }
+        h2 {
+            color: #333;
+        }
+        button {
+            padding: 10px 18px;
+            font-size: 16px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        #status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 15px;
+            min-height: 120px;
+            border: 1px solid #ccc;
+            background: #fff;
+            font-size: 16px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        .lang {
+            color: #555;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>🎤 Live Multilingual Transcription</h2>
+    <p>Speak in <b>Hindi / Telugu / English / Mixed</b>. The text will appear in real time.</p>
+
+    <button id="startBtn">Start Recording</button>
+    <button id="stopBtn" disabled>Stop Recording</button>
+
+    <div id="status">Status: Idle</div>
+
+    <div id="output"></div>
+
+<script>
+let ws;
+let audioContext;
+let processor;
+let input;
+let globalStream;
+
+const startBtn = document.getElementById("startBtn");
+const stopBtn = document.getElementById("stopBtn");
+const statusDiv = document.getElementById("status");
+const outputDiv = document.getElementById("output");
+
+// WebSocket endpoint
+const WS_URL = "ws://127.0.0.1:8007/ws/transcribe";
+
+startBtn.onclick = async () => {
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    statusDiv.innerText = "Status: Connecting...";
+
+    // Open WebSocket
+    ws = new WebSocket(WS_URL);
+    ws.binaryType = "arraybuffer";
+
+    ws.onopen = async () => {
+        statusDiv.innerText = "Status: Connected. Listening...";
+        await startAudioStream();
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        outputDiv.innerHTML =
+            `<div class="lang">Detected Language: ${data.detected_language} (${data.language_probability})</div>` +
+            `<div>${data.text}</div>`;
+    };
+
+    ws.onclose = () => {
+        statusDiv.innerText = "Status: Disconnected";
+    };
+
+    ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        statusDiv.innerText = "Status: Error";
+    };
+};
+
+stopBtn.onclick = () => {
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    statusDiv.innerText = "Status: Stopped";
+
+    if (processor) processor.disconnect();
+    if (input) input.disconnect();
+    if (audioContext) audioContext.close();
+    if (globalStream) globalStream.getTracks().forEach(track => track.stop());
+    if (ws) ws.close();
+};
+
+async function startAudioStream() {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+
+    globalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    input = audioContext.createMediaStreamSource(globalStream);
+
+    processor = audioContext.createScriptProcessor(4096, 1, 1);
+    input.connect(processor);
+    processor.connect(audioContext.destination);
+
+    processor.onaudioprocess = (event) => {
+        const floatData = event.inputBuffer.getChannelData(0);
+
+        // Convert Float32 to Int16 PCM
+        let pcm16 = new Int16Array(floatData.length);
+        for (let i = 0; i < floatData.length; i++) {
+            pcm16[i] = Math.max(-1, Math.min(1, floatData[i])) * 0x7fff;
+        }
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(pcm16.buffer);
+        }
+    };
+}
+</script>
+
+</body>
+</html>
